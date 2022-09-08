@@ -5,13 +5,13 @@ import os.path
 import requests
 
 def load_pickle_files():
-	with open('pickle_files/masculine_suffix.pkl', 'rb') as handle:
+	with open('files/masculine_suffix.pkl', 'rb') as handle:
 	    suffixes_masc = pickle.load(handle)
 
-	with open('pickle_files/feminine_suffix.pkl', 'rb') as handle:
+	with open('files/feminine_suffix.pkl', 'rb') as handle:
 	    suffixes_fem = pickle.load(handle)
 
-	with open('pickle_files/neutral_suffix.pkl', 'rb') as handle:
+	with open('files/neutral_suffix.pkl', 'rb') as handle:
 	    suffixes_neut = pickle.load(handle)
 
 	return suffixes_masc, suffixes_fem, suffixes_neut
