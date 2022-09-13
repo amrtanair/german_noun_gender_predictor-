@@ -61,13 +61,12 @@ if __name__ == "__main__":
 	while True:
 		noun = input("Enter noun:")
 		gender = calculate_gender(noun, suffixes_masc, suffixes_fem, suffixes_neut)
+		print(f'The calculated gender is {gender}')
 
 	    # Using a German Gender API to fetch the gender of the noune
 		response = (requests.get("https://german-gender-api.deta.dev/api/v1/nouns/" + noun)).json()
 
 		if "gender" in response.keys():
-			print(f'The gender assigned by the German Gender APi is {response["gender"]}')
+			print(f'The gender assigned by the German Gender API is {response["gender"]}')
 		else:
 			print(response["detail"]["message"])
-
-		print(f'The calculated gender is {gender}')
