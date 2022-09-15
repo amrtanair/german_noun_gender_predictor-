@@ -3,8 +3,10 @@ from spacy.lang.de.examples import sentences
 import pickle
 import os.path
 import requests
+from typing import List, Set, Dict, Tuple, Optional, Any, Counter
 
-def load_pickle_files():
+
+def load_pickle_files() -> Any:
 	with open('files/masculine_suffix.pkl', 'rb') as handle:
 	    suffixes_masc = pickle.load(handle)
 
@@ -16,33 +18,27 @@ def load_pickle_files():
 
 	return suffixes_masc, suffixes_fem, suffixes_neut
 
-def calculate_gender(noun, suffixes_masc, suffixes_fem, suffixes_neut):
+def calculate_gender(noun: str, suffixes_masc: Any, suffixes_fem: Any, suffixes_neut: Any) -> str:
 	suffixes = [noun[i:] for i in range(len(noun) - 3, len(noun))]
 
-	neut_p = 0
-	masc_p = 0
-	fem_p = 0
+	neut_p = 0.0
+	masc_p = 0.0
+	fem_p = 0.0
 
-	for s in suffixes:
-		if s in suffixes_neut.keys():
-			neut_p = neut_p + suffixes_neut[s]
-
-		if s in suffixes_masc.keys():
-			masc_p = masc_p + suffixes_masc[s]
-
-		if s in suffixes_fem.keys():
-			fem_p = fem_p + suffixes_fem[s]
+	neut_p = sum([suffixes_neut[key] for key in suffixes if key in suffixes_neut.keys()])
+	masc_p = sum([suffixes_masc[key] for key in suffixes if key in suffixes_masc.keys()])
+	fem_p = sum([suffixes_fem[key] for key in suffixes if key in suffixes_fem.keys()])
+	total = neut_p + masc_p + fem_p
 
 	# skip nouns where no suffixes were found
-	if neut_p + masc_p + fem_p == 0:
+	if total == 0:
 		print("Gender could not be determined")
 		exit()
 
 	# normalisation
-	masc_p = masc_p/(neut_p + masc_p + fem_p)
-	fem_p = fem_p/(neut_p + masc_p + fem_p)
-	neut_p = neut_p/(neut_p + masc_p + fem_p)
-
+	masc_p = masc_p/total
+	fem_p = fem_p/total
+	neut_p = neut_p/total
 
 	# assign gender based on highest normalised value
 	if neut_p > masc_p  and neut_p > fem_p:

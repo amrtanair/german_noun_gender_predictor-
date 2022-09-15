@@ -3,11 +3,14 @@ from spacy.lang.de.examples import sentences
 import pickle
 import os.path
 from collections import Counter
+from typing import List, Set, Dict, Tuple, Optional, Any, Counter
+
 
 # create intital gender-noun mapping from seed
-def initial_seeds():
+def initial_seeds() -> Dict[str, Set[str]]:
 	nouns = open("files/nouns.txt", "r")
-	seed = {key: set() for key in ["Masc", "Fem", "Neut"]}
+	seed : Dict = {key: set() for key in ["Masc", "Fem", "Neut"]}
+	# seed = {key: set() for key in ["Masc", "Fem", "Neut"]}
 
 	for n in nouns:
 	    article = n.split()[0]
@@ -21,7 +24,7 @@ def initial_seeds():
 	return seed
 
 # create a pickle file that contains spacy object of every line in the corpus
-def create_corpus():
+def create_corpus() -> None:
 	nlp = spacy.load("de_core_news_sm")
 	text = []
 	with open('files/train.txt') as train:
@@ -30,23 +33,24 @@ def create_corpus():
 	with open('files/corpus.pkl', 'wb') as handle:
 	    pickle.dump(text, handle)
 
-def load_corpus():
+def load_corpus() -> Any:
+	# this function returns a pickle object but I am not sure what its typehint would be
 	with open('files/corpus.pkl', 'rb') as handle:
 		corpus = pickle.load(handle)
-	# obj = open('files/corpus.pkl', 'rb')
-	# corpus = pickle.load(obj)
-	# obj.close()
 	return corpus
 
-def get_corpus():
-	if os.path.exists("files/corpus.pkl"):
-		corpus = load_corpus()
-	else:
+def get_corpus() -> Any:
+	# this function returns a pickle object but I am not sure what its typehint would be
+	if not os.path.exists("files/corpus.pkl"):
 		create_corpus()
-		corpus = load_corpus()
+	corpus = load_corpus()
 	return corpus
 
-def rule_based_classification(corpus, seed):
+def evaluate(processed_nouns: int, correctly_categorised_nouns: int) -> None:
+	print(f'Total nouns where a gender was assigned and Spacy has the gender categorised is {processed_nouns}')
+	print(f'Total number of nouns correctly labelled (considering spacy gender categorisation as gold data)is {correctly_categorised_nouns}. Hence, accuracy is {(correctly_categorised_nouns/processed_nouns)*100}')
+
+def rule_based_classification(corpus: Any, seed: Dict[str, Set[Any]]) -> Dict[str, Set[str]]:
 	processed_nouns = 0
 	correctly_categorised_nouns = 0
 	for line in corpus:
@@ -54,30 +58,11 @@ def rule_based_classification(corpus, seed):
 	    	if token.pos_ == "NOUN":
 	    		# get word preceeding current token
 		    	article = (line[idx - 1]).text
-		    	# # get case of current token
-		    	# case = token.morph.get("Case")
 		    	# get text of token
 		    	text = token.text
 		    	# get gold data for gender, to compare against the calculated gender
 		    	spacy_gender = token.morph.get("Gender")
 		    	gender = None
-
-	    		# if article in ["der", "die", "das", "dem", "des", "den"]:
-		    	# 	if article == "der":
-		    	# 		if case == "Nom":
-		    	# 			gender = "Masc"
-		    	# 		elif case == "Dat" or case == "Gen":
-		    	# 			gender = "Fem"
-		    	# 	elif article == "die":
-		    	# 		gender = "Fem"
-		    	# 	elif article == "das":
-		    	# 		gender = "Neut"
-		    	# 	elif article == "dem" or article == "des":
-		    	# 		gender = "Masc"
-		    	# 	elif article == "den" and case == "Acc":
-		    	# 		gender = "Masc"
-
-		    	# german grammar rules for article/nouns
 
 	    		if article == "das":
 	    			gender = "Neut"
@@ -94,15 +79,13 @@ def rule_based_classification(corpus, seed):
 		    			processed_nouns = processed_nouns + 1
 		    			if gender == spacy_gender[0]:
 		    				correctly_categorised_nouns = correctly_categorised_nouns + 1
-		    	
 
-	print(f'Total nouns where a gender was assigned and Spacy has the gender categorised is {processed_nouns}')
-	print(f'Total number of nouns correctly labelled (considering spacy gender categorisation as gold data)is {correctly_categorised_nouns}. Hence, accuracy is {(correctly_categorised_nouns/processed_nouns)*100}')
+	evaluate(processed_nouns, correctly_categorised_nouns)
 	return seed
 
-def _create_suffix_bank(seed_for_gender):
-	counter_suffixes = Counter({})
-	for nouns in set(seed_for_gender):
+def _create_suffix_bank(seed_for_gender: Set) -> Dict[str, str]:
+	counter_suffixes: Counter = Counter({})
+	for nouns in seed_for_gender:
 		suffixes = [nouns[i:] for i in range(len(nouns) - 3, len(nouns))]
 		for s in suffixes:
 			counter_suffixes.update({s : 1})
@@ -113,7 +96,7 @@ def _create_suffix_bank(seed_for_gender):
 
 	return suffixes_dict
 
-def create_suffix_bank(seed):
+def create_suffix_bank(seed: Dict[str, Set[Any]]) -> Dict[str, Dict[str, str]]:
 	suffix_bank = {}
 
 	for gender in seed.keys():
@@ -121,7 +104,8 @@ def create_suffix_bank(seed):
 
 	return suffix_bank
 
-def morphology_based_classification(corpus, seed, suffix_bank):
+# def morphology_based_classification(corpus: Any, seed: Dict[str, Set[str]], suffix_bank: Dict[str, Dict[str, str]]) -> Dict[str, Set[str]]
+def morphology_based_classification(corpus: Any, seed: Dict[str, Set[str]], suffix_bank: Any) -> Dict[str, Set[str]]:
 	suffixes_fem = suffix_bank["Fem"]
 	suffixes_masc = suffix_bank["Masc"]
 	suffixes_neut = suffix_bank["Neut"]
@@ -130,8 +114,6 @@ def morphology_based_classification(corpus, seed, suffix_bank):
 	processed_nouns = 0
 	# nouns where calculated gender and Spacy assigned gender were the same
 	correctly_categorised_nouns = 0
-	# total number of nouns in corpus
-	total_nouns = 0
 	for line in corpus:
 	    for idx, token in enumerate(line):
 	    	if token.pos_ == "NOUN":
@@ -139,8 +121,6 @@ def morphology_based_classification(corpus, seed, suffix_bank):
 	    		text = token.text
 	    		# get gold data for gender, to compare against the calculated gender
 	    		spacy_gender = token.morph.get("Gender")
-	    		# total number of nouns in corpus
-	    		total_nouns = total_nouns + 1
 	    		# suffix array for current token calculated to give suffixes with length less than or equal to 3
 	    		suffixes = [text[i:] for i in range(len(text) - 3, len(text))]
 
@@ -172,8 +152,7 @@ def morphology_based_classification(corpus, seed, suffix_bank):
 		    	else:
 		    		gender = "tbd"
 
-		    	# check if gender was calculated and spacy assigned gender exists. if it does and the assigned gender is corrected compared
-		    	# to the spacy assignmend, add it to the seed.
+		    	# check if gender was calculated and spacy assigned gender exists.
 		    	if gender:
 		    		# if gender has been assigned, add the noun to the seed
 		    		if gender != "tbd":
@@ -184,9 +163,7 @@ def morphology_based_classification(corpus, seed, suffix_bank):
 		    			if gender == spacy_gender[0]:
 		    				correctly_categorised_nouns = correctly_categorised_nouns + 1
 
-	print(f'Total number of nouns(duplicates) in corpus is {total_nouns}')
-	print(f'Total nouns where a gender was assigned and Spacy has the gender categorised is {processed_nouns}')
-	print(f'Total number of nouns correctly labelled (considering spacy gender categorisation as gold data)is {correctly_categorised_nouns}. Hence, accuracy is {(correctly_categorised_nouns/processed_nouns)*100}')
+	evaluate(processed_nouns, correctly_categorised_nouns)
 	return seed
 
 if __name__ == "__main__":
