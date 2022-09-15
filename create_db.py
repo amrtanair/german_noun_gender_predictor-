@@ -2,6 +2,7 @@ import spacy
 from spacy.lang.de.examples import sentences 
 import pickle
 import os.path
+from collections import Counter
 
 # create intital gender-noun mapping from seed
 def initial_seeds():
@@ -99,85 +100,36 @@ def rule_based_classification(corpus, seed):
 	print(f'Total number of nouns correctly labelled (considering spacy gender categorisation as gold data)is {correctly_categorised_nouns}. Hence, accuracy is {(correctly_categorised_nouns/processed_nouns)*100}')
 	return seed
 
+def _create_suffix_bank(seed_for_gender):
+	counter_suffixes = Counter({})
+	for nouns in set(seed_for_gender):
+		suffixes = [nouns[i:] for i in range(len(nouns) - 3, len(nouns))]
+		for s in suffixes:
+			counter_suffixes.update({s : 1})
+
+	# suffixes_dict = {key:value for key, value in dict(counter_suffixes).items() if value > 3}
+	total = sum(dict(counter_suffixes).values())
+	suffixes_dict = {key: value / total for key, value in dict(counter_suffixes).items()}
+
+	return suffixes_dict
 
 def create_suffix_bank(seed):
-	suffixes_masc = {}
-	suffixes_fem = {}
-	suffixes_neut = {}
+	suffix_bank = {}
 
-	# Masculine
-	c = 0
-	# loop through keys and create suffixes for each noun. only add suffixes of length less than or equal to 3
-	for nouns in set(seed["Masc"]):
-		suffixes = [nouns[i:] for i in range(len(nouns) - 3, len(nouns))]
-		for s in suffixes:
-			if s in suffixes_masc.keys():
-				suffixes_masc[s] = suffixes_masc[s] + 1
-			else:
-				suffixes_masc[s] = 1
+	for gender in seed.keys():
+		suffix_bank[gender] = _create_suffix_bank(seed[gender])
 
-	# delete suffixes with frequency less than 3. Generate probability distribution for rest of the suffixes
-	for key in list(suffixes_masc.keys()):
-		if suffixes_masc[key] < 3:
-			del suffixes_masc[key]
-		else:
-			c = c + suffixes_masc[key]
+	return suffix_bank
 
-	for key, val in suffixes_masc.items():
-		suffixes_masc[key] = suffixes_masc[key]/c
+def morphology_based_classification(corpus, seed, suffix_bank):
+	suffixes_fem = suffix_bank["Fem"]
+	suffixes_masc = suffix_bank["Masc"]
+	suffixes_neut = suffix_bank["Neut"]
 
-	# Feminine
-	c = 0
-	# loop through keys and create suffixes for each noun. only add suffixes of length less than or equal to 3
-	for nouns in set(seed["Fem"]):
-		suffixes = [nouns[i:] for i in range(len(nouns) - 3, len(nouns))]
-		for s in suffixes:
-			if s in suffixes_fem.keys():
-				suffixes_fem[s] = suffixes_fem[s] + 1
-			else:
-				suffixes_fem[s] = 1
-
-	# delete suffixes with frequency less than 3. Generate probability distribution for rest of the suffixes
-	for key in list(suffixes_fem.keys()):
-		if suffixes_fem[key] < 3:
-			del suffixes_fem[key]
-		else:
-			c = c + suffixes_fem[key]
-
-	for key, val in suffixes_fem.items():
-		suffixes_fem[key] = suffixes_fem[key]/c
-
-	# Neutral
-	c = 0
-	# loop through keys and create suffixes for each noun. only add suffixes of length less than or equal to 3
-	for nouns in set(seed["Neut"]):
-		suffixes = [nouns[i:] for i in range(len(nouns) - 3, len(nouns))]
-		for s in suffixes:
-			if s in suffixes_neut.keys():
-				suffixes_neut[s] = suffixes_neut[s] + 1
-			else:
-				suffixes_neut[s] = 1
-
-	# delete suffixes with frequency less than 3. Generate probability distribution for rest of the suffixes
-	for key in list(suffixes_neut.keys()):
-		if suffixes_neut[key] < 3:
-			del suffixes_neut[key]
-		else:
-			c = c + suffixes_neut[key]
-
-	for key, val in suffixes_neut.items():
-		suffixes_neut[key] = suffixes_neut[key]/c
-
-
-	return suffixes_masc, suffixes_fem, suffixes_neut
-
-def morphology_based_classification(corpus, seed, suffixes_masc, suffixes_fem, suffixes_neut):
 	# total number of nouns for which there was a calculated gender and a Spacy assigned gender
 	processed_nouns = 0
 	# nouns where calculated gender and Spacy assigned gender were the same
 	correctly_categorised_nouns = 0
-	# nouns where Spacy did not assign gender
-	spacy_gender_not_exist = 0
 	# total number of nouns in corpus
 	total_nouns = 0
 	for line in corpus:
@@ -197,17 +149,10 @@ def morphology_based_classification(corpus, seed, suffixes_masc, suffixes_fem, s
 		    	masc_p = 0.0
 		    	fem_p = 0.0
 
-		    	for s in suffixes:
-		    		if s in suffixes_neut.keys():
-		    			neut_p = neut_p + suffixes_neut[s]
+		    	neut_p = sum([suffixes_neut[key] for key in suffixes if key in suffixes_neut.keys()])
+		    	masc_p = sum([suffixes_masc[key] for key in suffixes if key in suffixes_masc.keys()])
+		    	fem_p = sum([suffixes_fem[key] for key in suffixes if key in suffixes_fem.keys()])
 
-		    		if s in suffixes_masc.keys():
-		    			masc_p = masc_p + suffixes_masc[s]
-
-		    		if s in suffixes_fem.keys():
-		    			fem_p = fem_p + suffixes_fem[s]
-
-		    	# skip nouns where no suffixes were found
 		    	if neut_p + masc_p + fem_p == 0:
 		    		continue
 
@@ -238,13 +183,9 @@ def morphology_based_classification(corpus, seed, suffixes_masc, suffixes_fem, s
 		    			processed_nouns = processed_nouns + 1
 		    			if gender == spacy_gender[0]:
 		    				correctly_categorised_nouns = correctly_categorised_nouns + 1
-		    		
-		    	elif len(spacy_gender) == 0:
-		    		spacy_gender_not_exist = spacy_gender_not_exist + 1
 
 	print(f'Total number of nouns(duplicates) in corpus is {total_nouns}')
 	print(f'Total nouns where a gender was assigned and Spacy has the gender categorised is {processed_nouns}')
-	print(f'Total number of nouns for which Spacy did not have gender assigned is {spacy_gender_not_exist}')
 	print(f'Total number of nouns correctly labelled (considering spacy gender categorisation as gold data)is {correctly_categorised_nouns}. Hence, accuracy is {(correctly_categorised_nouns/processed_nouns)*100}')
 	return seed
 
@@ -259,12 +200,11 @@ if __name__ == "__main__":
 	print(f'''After Step 2: Number of masculine nouns is {len(seed["Masc"])}, feminine nouns is {len(seed["Fem"])} and neutral nouns is {len(seed["Neut"])}. 
 		The total number of nouns in the seed is {len(seed["Masc"])+len(seed["Fem"])+len(seed["Neut"])}.''')
 
-	suffixes_masc, suffixes_fem, suffixes_neut = create_suffix_bank(seed)
-	seed = morphology_based_classification(corpus, seed, suffixes_masc, suffixes_fem, suffixes_neut)
+	suffix_bank = create_suffix_bank(seed)
+	seed = morphology_based_classification(corpus, seed, suffix_bank)
 
 	print(f'''After Step 3: Number of masculine nouns is {len(seed["Masc"])}, feminine nouns is {len(seed["Fem"])} and neutral nouns is {len(seed["Neut"])}. 
 		The total number of nouns in the seed is {len(seed["Masc"])+len(seed["Fem"])+len(seed["Neut"])}.''')
-
 
 	# write seed to pickle file
 	with open('files/seed.pkl', 'wb') as handle:
@@ -272,11 +212,11 @@ if __name__ == "__main__":
 
 	# write suffix bank to pickle file
 	with open('files/neutral_suffix.pkl', 'wb') as handle:
-	    pickle.dump(suffixes_neut, handle)
+	    pickle.dump(suffix_bank["Neut"], handle)
 
 	with open('files/masculine_suffix.pkl', 'wb') as handle:
-	    pickle.dump(suffixes_masc, handle)	
+	    pickle.dump(suffix_bank["Masc"], handle)	
 
 	with open('files/feminine_suffix.pkl', 'wb') as handle:
-	    pickle.dump(suffixes_fem, handle)	
+	    pickle.dump(suffix_bank["Fem"], handle)	
 
